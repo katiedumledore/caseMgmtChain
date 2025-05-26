@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GDPR Case Management System - Blockchain Platform</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <!-- Load ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    .case-status-registered { color: #FFA500; }
+    .case-status-inprogress { color: #0000FF; }
+    .case-status-decided { color: #008000; }
+    .case-status-closed { color: #808080; }
+    .case-status-archived { color: #6c757d; }
+    .nav-tabs .nav-link.active {
+      font-weight: bold;
+      border-bottom: 3px solid #0d6efd;
+    }
+    .gdpr-highlight {
+      border-left: 4px solid #28a745;
+      background-color: #f8f9fa;
+    }
+    .privacy-notice {
+      background-color: #e7f3ff;
+      border: 1px solid #b8daff;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .encryption-badge {
+      background-color: #28a745;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+    }
+    .table-danger {
+      background-color: rgba(220, 53, 69, 0.1);
+    }
+    .overdue-deadline {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-loading {
+      position: relative;
+    }
+    .btn-loading .fas.fa-spinner {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .form-control:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    .address-input {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-shield-alt"></i> GDPR Case Manager
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" id="homeNav">Home</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="registerCaseNav">Register Case</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="casesNav">View Cases</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="gdprNav">GDPR Tools</a>
+          </li>
+          <li class="nav-item dpo-only" style="display: none;">
+            <a class="nav-link" href="#" id="dpoNav">DPO Dashboard</a>
+          </li>
+          <li class="nav-item admin-only" style="display: none;">
+            <a class="nav-link" href="#" id="adminNav">Admin Panel</a>
+          </li>
+        </ul>
+        <div class="d-flex">
+          <span class="navbar-text me-3 text-light" id="accountAddress">Not connected</span>
+          <button class="btn btn-light" id="connectWallet">Connect Wallet</button>
+          <button class="btn btn-secondary ms-2" id="disconnectWallet" style="display: none;">Disconnect</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <!-- Connection Alert -->
+    <div class="alert alert-warning" id="connectionAlert" role="alert">
+      <strong>Not connected to blockchain!</strong> Please connect your wallet to use the application.
+    </div>
+    
+    <!-- Privacy Notice -->
+    <div class="privacy-notice">
+      <h6><i class="fas fa-shield-alt"></i> Privacy & GDPR Compliance</h6>
+      <small>This system is designed to be GDPR-compliant. Personal data is minimized on-chain, with sensitive information stored off-chain using encryption. You have rights regarding your personal data including access, rectification, and erasure.</small>
+    </div>
+    
+    <!-- Home Section -->
+    <div id="homeSection" class="section-content">
+      <div class="jumbotron bg-light p-5 rounded">
+        <h1 class="display-4">Welcome to GDPR Case Manager</h1>
+        <p class="lead">A GDPR-compliant decentralized case management system powered by blockchain technology.</p>
+        <hr class="my-4">
+        <p>Manage GDPR cases, submit encrypted documents, handle data subject requests, and ensure compliance - all while respecting privacy rights and regulatory requirements.</p>
+        <a class="btn btn-primary btn-lg" href="#" id="homeRegisterBtn">Register a Case</a>
+      </div>
+      
+      <div class="row mt-4">
+        <div class="col-md-4">
+          <div class="card mb-4 gdpr-highlight">
+            <div class="card-body">
+              <h5 class="card-title"><i class="fas fa-user-shield"></i> GDPR Compliant</h5>
+              <p class="card-text">Built with privacy by design principles. Personal data is minimized on-chain and encrypted off-chain.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title"><i class="fas fa-lock"></i> Encrypted Documents</h5>
+              <p class="card-text">Case documents are encrypted and stored securely with key management for data erasure compliance.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title"><i class="fas fa-balance-scale"></i> Regulatory Compliance</h5>
+              <p class="card-text">Handles data subject requests, retention periods, and legal basis documentation for GDPR compliance.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Register Case Section -->
+    <div id="registerCaseSection" class="section-content" style="display: none;">
+      <h2>Register a New GDPR Case</h2>
+      <div class="card">
+        <div class="card-body">
+          <div class="alert alert-info">
+            <strong>Privacy Notice:</strong> Case details will be hashed and stored securely. Personal data is not stored directly on the blockchain.
+          </div>
+          <form id="registerCaseForm">
+            <div class="mb-3">
+              <label for="caseTitle" class="form-label">Case Title</label>
+              <input type="text" class="form-control" id="caseTitle" required 
+                placeholder="Brief title for the case">
+              <small class="form-text text-muted">This will be hashed for on-chain storage.</small>
+            </div>
+            <div class="mb-3">
+              <label for="caseDescription" class="form-label">Case Description</label>
+              <textarea class="form-control" id="caseDescription" rows="3" required
+                placeholder="Detailed case description"></textarea>
+              <small class="form-text text-muted">This will be hashed for on-chain storage.</small>
+            </div>
+            <div class="mb-3">
+              <label for="initialDocumentIpfs" class="form-label">Initial Document (IPFS Hash)</label>
+              <input type="text" class="form-control" id="initialDocumentIpfs" required
+                placeholder="QmXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
+              <small class="form-text text-muted">Upload your initial document to IPFS first, then enter the hash here.</small>
+            </div>
+            <div class="mb-3">
+              <label for="dataClassification" class="form-label">Data Classification</label>
+              <select class="form-select" id="dataClassification" required>
+                <option value="">Select classification</option>
+                <option value="public">Public</option>
+                <option value="internal">Internal</option>
+                <option value="confidential">Confidential</option>
+                <option value="restricted">Restricted</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="caseType" class="form-label">Case Type</label>
+              <select class="form-select" id="caseType" required>
+                <option value="">Select case type</option>
+                <option value="0">General</option>
+                <option value="1">GDPR Compliance</option>
+                <option value="2">Data Breach</option>
+                <option value="3">Cross Border</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="requiresEncryption">
+                <label class="form-check-label" for="requiresEncryption">
+                  Requires Document Encryption
+                </label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="retentionPeriod" class="form-label">Data Retention Period (days)</label>
+              <input type="number" class="form-control" id="retentionPeriod" min="1" max="3650" value="365" required>
+              <small class="form-text text-muted">Legal requirement for data retention (1-3650 days).</small>
+            </div>
+            <div class="mb-3">
+              <label for="legalBasis" class="form-label">Legal Basis for Processing</label>
+              <select class="form-select" id="legalBasis" required>
+                <option value="">Select legal basis</option>
+                <option value="legal_obligation">Legal Obligation</option>
+                <option value="legitimate_interest">Legitimate Interest</option>
+                <option value="public_task">Public Task</option>
+                <option value="vital_interests">Vital Interests</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Register Case</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Cases Section -->
+    <div id="casesSection" class="section-content" style="display: none;">
+      <h2>GDPR Case List</h2>
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row mb-3">
+            <div class="mb-3">
+              <label for="caseSearchInput" class="form-label">Search Cases</label>
+              <input type="text" class="form-control" id="caseSearchInput" 
+                placeholder="Search by case ID, type, or status" 
+                aria-label="Search cases">
+            </div>
+            <div class="col-md-6 text-md-end">
+              <button class="btn btn-outline-primary" id="refreshCaseList">
+                <i class="fas fa-sync-alt"></i> Refresh
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Case ID</th>
+                  <th>Case Hash</th>
+                  <th>Type</th>
+                  <th>Filing Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="caseListBody">
+                <tr>
+                  <td colspan="6" class="text-center">Loading cases...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- GDPR Tools Section -->
+    <div id="gdprSection" class="section-content" style="display: none;">
+      <h2>GDPR Tools & Data Subject Rights</h2>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5><i class="fas fa-user-check"></i> Data Subject Requests</h5>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info" id="gdprRequestInfo">
+                <i class="fas fa-info-circle"></i>
+                <strong>Note:</strong> To submit a data subject request, please first navigate to the specific case you want to make a request about, then return to this section.
+              </div>
+              <p>Exercise your GDPR rights:</p>
+              <div class="mb-3">
+                <label for="requestType" class="form-label">Request Type</label>
+                <select class="form-select" id="requestType" aria-label="Select request type">
+                  <option value="0">Access (Article 15)</option>
+                  <option value="1">Rectification (Article 16)</option>
+                  <option value="2">Erasure (Article 17)</option>
+                  <option value="3">Data Portability (Article 20)</option>
+                  <option value="4">Restrict Processing (Article 18)</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="requestDetails" class="form-label">Request Details</label>
+                <textarea class="form-control" id="requestDetails" rows="3" 
+                  placeholder="Describe your request..." aria-label="Request details"></textarea>
+              </div>
+              <button class="btn btn-primary" id="dataSubjectRequestBtn">Submit Request</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5><i class="fas fa-info-circle"></i> Your GDPR Rights</h5>
+            </div>
+            <div class="card-body">
+              <ul class="list-unstyled">
+                <li><strong>Right to Access:</strong> Get copies of your personal data</li>
+                <li><strong>Right to Rectification:</strong> Correct inaccurate data</li>
+                <li><strong>Right to Erasure:</strong> Request deletion of your data</li>
+                <li><strong>Right to Portability:</strong> Receive your data in a structured format</li>
+                <li><strong>Right to Restrict:</strong> Limit how your data is processed</li>
+              </ul>
+              <small class="text-muted">
+                Requests will be processed within 30 days as required by GDPR Article 12.
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Request History Section -->
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5><i class="fas fa-history"></i> Request History</h5>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Request ID</th>
+                      <th>Case ID</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Request Date</th>
+                      <th>Deadline</th>
+                    </tr>
+                  </thead>
+                  <tbody id="requestHistoryBody">
+                    <tr>
+                      <td colspan="6" class="text-center">Loading request history...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <button class="btn btn-outline-primary" id="refreshRequestHistory">
+                <i class="fas fa-sync-alt"></i> Refresh History
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- DPIA Guidance Section -->
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card mb-4 gdpr-highlight">
+            <div class="card-header">
+              <h5><i class="fas fa-shield-alt"></i> Data Protection Impact Assessment (DPIA)</h5>
+            </div>
+            <div class="card-body">
+              <p><strong>DPIA is mandatory for high-risk processing activities, including blockchain systems.</strong></p>
+              <div class="row">
+                <div class="col-md-6">
+                  <h6>When to conduct a DPIA:</h6>
+                  <ul>
+                    <li>Processing sensitive personal data</li>
+                    <li>Using new technologies (blockchain)</li>
+                    <li>Cross-border data transfers</li>
+                    <li>Large-scale processing</li>
+                  </ul>
+                </div>
+                <div class="col-md-6">
+                  <h6>Resources:</h6>
+                  <ul>
+                    <li><a href="https://www.dataprotection.ie/en/organisations/know-your-obligations/data-protection-impact-assessments" target="_blank" rel="noopener">Irish DPC DPIA Guidance</a></li>
+                    <li><a href="https://www.edpb.europa.eu/our-work-tools/documents/public-consultations/2025/guidelines-022025-processing-personal-data_en" target="_blank" rel="noopener">EDPB Blockchain Guidelines</a></li>
+                  </ul>
+                </div>
+              </div>
+              <button class="btn btn-success" id="generateDPIATemplate">
+                <i class="fas fa-download"></i> Generate DPIA Template
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Case Details Section -->
+    <div id="caseDetailsSection" class="section-content" style="display: none;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Case Details <span class="badge bg-primary" id="caseIdBadge"></span></h2>
+        <button class="btn btn-outline-secondary" id="backToCaseList">
+          <i class="fas fa-arrow-left"></i> Back to List
+        </button>
+      </div>
+      
+      <ul class="nav nav-tabs" id="caseDetailsTabs">
+        <li class="nav-item">
+          <a class="nav-link active" data-bs-toggle="tab" href="#caseInfo">Case Info</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#documents">Documents</a>
+        </li>
+        <li class="nav-item judge-only" style="display: none;">
+          <a class="nav-link" data-bs-toggle="tab" href="#meetings">Meetings</a>
+        </li>
+      </ul>
+      
+      <div class="tab-content mt-3">
+        <div class="tab-pane fade show active" id="caseInfo">
+          <div class="card mb-4">
+            <div class="card-header">Basic Information</div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <p><strong>Case Hash:</strong> <span id="detailCaseHash" class="font-monospace"></span></p>
+                  <p><strong>Case Type:</strong> <span id="detailCaseType"></span></p>
+                  <p><strong>Filing Date:</strong> <span id="detailFilingDate"></span></p>
+                  <p><strong>Last Updated:</strong> <span id="detailLastUpdated"></span></p>
+                  <p><strong>Status:</strong> <span id="detailStatus"></span></p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>GDPR Case:</strong> <span id="detailIsGDPR"></span></p>
+                  <p><strong>Assigned Reviewer:</strong> <span id="detailJudge"></span></p>
+                  <p><strong>Next Meeting:</strong> <span id="detailNextHearing"></span></p>
+                  <p><strong>Retention Period:</strong> <span id="detailRetentionPeriod"></span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Case Actions Card -->
+          <div class="card" id="caseActionsCard">
+            <div class="card-header">Case Actions</div>
+            <div class="card-body">
+              <!-- Judge-only actions -->
+              <div class="judge-only" style="display: none;">
+                <div class="mb-3">
+                  <label for="hearingDateInput" class="form-label">Schedule Next Meeting</label>
+                  <div class="input-group mb-3">
+                    <input type="datetime-local" class="form-control" id="hearingDateInput">
+                    <button class="btn btn-primary" id="scheduleHearingBtn">Schedule</button>
+                  </div>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="caseStatusSelect" class="form-label">Update Case Status</label>
+                  <div class="input-group mb-3">
+                    <select class="form-select" id="caseStatusSelect">
+                      <option value="0">Registered</option>
+                      <option value="1">In Progress</option>
+                      <option value="2">Decided</option>
+                      <option value="3">Closed</option>
+                      <option value="4">Archived</option>
+                    </select>
+                    <button class="btn btn-primary" id="updateStatusBtn">Update</button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Admin-only actions -->
+              <div class="admin-only" style="display: none;">
+                <div class="mb-3">
+                  <label for="judgeAddressInput" class="form-label">Assign Case Reviewer</label>
+                  <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="judgeAddressInput" placeholder="Reviewer's wallet address">
+                    <button class="btn btn-primary" id="assignJudgeBtn">Assign</button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Submit document section -->
+              <div class="mt-4">
+                <h6>Submit Document</h6>
+                <div class="mb-3">
+                  <label for="documentIpfsHash" class="form-label">Document IPFS Hash</label>
+                  <input type="text" class="form-control" id="documentIpfsHash" 
+                    placeholder="Enter IPFS hash (e.g., QmXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX)">
+                  <small class="form-text text-muted">Upload your document to IPFS first, then enter the hash here.</small>
+                </div>
+                <div class="mb-3">
+                  <label for="newDocumentType" class="form-label">Document Type</label>
+                  <select class="form-select" id="newDocumentType">
+                    <option value="">Select document type</option>
+                    <option value="Privacy Assessment">Privacy Assessment</option>
+                    <option value="Data Breach Report">Data Breach Report</option>
+                    <option value="Compliance Report">Compliance Report</option>
+                    <option value="Data Processing Record">Data Processing Record</option>
+                    <option value="GDPR Request">GDPR Request</option>
+                    <option value="Supporting Evidence">Supporting Evidence</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="isEncrypted">
+                    <label class="form-check-label" for="isEncrypted">
+                      Document is encrypted
+                    </label>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label for="encryptionKey" class="form-label">Encryption Key Reference (optional)</label>
+                  <input type="text" class="form-control" id="encryptionKey" 
+                    placeholder="Reference to encryption key">
+                  <small class="form-text text-muted">Used for key management and potential erasure.</small>
+                </div>
+                <button class="btn btn-primary" id="submitDocumentBtn">Submit Document</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="tab-pane fade" id="documents">
+          <div class="card">
+            <div class="card-header">Case Documents</div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Type Hash</th>
+                      <th>Submitted By</th>
+                      <th>Date</th>
+                      <th>Encrypted</th>
+                      <th>Access Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="documentListBody">
+                    <!-- Document rows will be added here -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="tab-pane fade" id="meetings">
+          <div class="card">
+            <div class="card-header">Meeting Schedule</div>
+            <div class="card-body">
+              <div id="hearingDetails">
+                <!-- Meeting details will be displayed here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- DPO Dashboard Section -->
+    <div id="dpoSection" class="section-content" style="display: none;">
+      <h2>Data Protection Officer Dashboard</h2>
+      
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5><i class="fas fa-clipboard-list"></i> Pending Data Subject Requests</h5>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>Request ID</th>
+                      <th>Case ID</th>
+                      <th>Requester</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Deadline</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dpoRequestsList">
+                    <tr>
+                      <td colspan="8" class="text-center">Loading requests...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <button class="btn btn-outline-primary mt-2" id="refreshDPORequests">
+                <i class="fas fa-sync-alt"></i> Refresh Requests
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">Process Request</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label for="requestIdInput" class="form-label">Request ID</label>
+                <input type="number" class="form-control" id="requestIdInput" placeholder="Enter request ID">
+              </div>
+              <div class="mb-3">
+                <label for="requestStatusSelect" class="form-label">Decision</label>
+                <select class="form-select" id="requestStatusSelect">
+                  <option value="1">Approve</option>
+                  <option value="2">Reject</option>
+                  <option value="3">Complete</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label for="responseDetails" class="form-label">Response Details</label>
+                <textarea class="form-control" id="responseDetails" rows="3" 
+                  placeholder="Enter response details..."></textarea>
+              </div>
+              <button class="btn btn-primary" id="processRequestBtn">Process Request</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">Revoke Encryption Key</div>
+            <div class="card-body">
+              <div class="alert alert-warning">
+                <strong>Warning:</strong> This will make documents unreadable and simulate data erasure.
+              </div>
+              <div class="mb-3">
+                <label for="revokeKeyCase" class="form-label">Case ID</label>
+                <input type="number" class="form-control" id="revokeKeyCase" placeholder="Enter case ID">
+              </div>
+              <div class="mb-3">
+                <label for="revokeKeyHash" class="form-label">Encryption Key Reference</label>
+                <input type="text" class="form-control" id="revokeKeyHash" placeholder="Enter key reference">
+              </div>
+              <button class="btn btn-danger" id="revokeKeyBtn">Revoke Key</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Admin Panel Section -->
+    <div id="adminSection" class="section-content" style="display: none;">
+      <h2>Admin Panel</h2>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header">Add Case Reviewer</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label for="newJudgeAddress" class="form-label">Reviewer Wallet Address</label>
+                <input type="text" class="form-control address-input" id="newJudgeAddress" 
+                  placeholder="0x1234567890123456789012345678901234567890"
+                  aria-label="Reviewer wallet address"
+                  maxlength="42">
+                <div class="valid-feedback">
+                  Valid Ethereum address format
+                </div>
+                <div class="invalid-feedback">
+                  Please enter a valid Ethereum address (0x followed by 40 hexadecimal characters)
+                </div>
+                <small class="form-text text-muted">Enter the Ethereum wallet address of the case reviewer.</small>
+              </div>
+              <button type="button" class="btn btn-primary" id="addJudgeBtn">
+                <i class="fas fa-user-plus"></i> Add Reviewer
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="card mb-4">
+            <div class="card-header">Add Data Protection Officer</div>
+            <div class="card-body">
+              <div class="mb-3">
+                <label for="newDPOAddress" class="form-label">DPO Wallet Address</label>
+                <input type="text" class="form-control address-input" id="newDPOAddress" 
+                  placeholder="0x1234567890123456789012345678901234567890"
+                  aria-label="DPO wallet address"
+                  maxlength="42">
+                <div class="valid-feedback">
+                  Valid Ethereum address format
+                </div>
+                <div class="invalid-feedback">
+                  Please enter a valid Ethereum address (0x followed by 40 hexadecimal characters)
+                </div>
+                <small class="form-text text-muted">Enter the Ethereum wallet address of the Data Protection Officer.</small>
+              </div>
+              <button type="button" class="btn btn-primary" id="addDPOBtn">
+                <i class="fas fa-shield-alt"></i> Add DPO
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header">System Controls & GDPR Compliance</div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6>System Controls</h6>
+              <button class="btn btn-warning me-2 mb-2" id="pauseSystemBtn">
+                <i class="fas fa-pause"></i> Pause System
+              </button>
+              <button class="btn btn-success mb-2" id="unpauseSystemBtn">
+                <i class="fas fa-play"></i> Unpause System
+              </button>
+              <br>
+              <button class="btn btn-info mb-2" id="archiveExpiredBtn">
+                <i class="fas fa-archive"></i> Archive Expired Cases
+              </button>
+            </div>
+            <div class="col-md-6">
+              <h6>GDPR Compliance Reports</h6>
+              <button class="btn btn-primary mb-2" id="generateROPABtn">
+                <i class="fas fa-file-export"></i> Generate ROPA Report
+              </button>
+              <br>
+              <small class="form-text text-muted">
+                Records of Processing Activities for DPC compliance
+              </small>
+            </div>
+          </div>
+          <small class="form-text text-muted d-block mt-2">
+            Emergency controls for system maintenance and GDPR compliance.
+          </small>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Loading Spinner Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-body text-center p-4">
+            <div class="spinner-border text-primary mb-3" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5 id="loadingModalText">Processing transaction...</h5>
+            <small class="text-muted">Please wait and don't close this window.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Alert Modal -->
+    <div class="modal fade" id="alertModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="alertModalTitle">Message</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="alertModalBody">
+            <!-- Alert message will be displayed here -->
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Bundle with Popper -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Main Application JS -->
+  <script src="justiChain.js"></script>
+</body>
+</html>
